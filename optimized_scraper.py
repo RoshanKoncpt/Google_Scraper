@@ -29,6 +29,8 @@ class OptimizedGoogleMapsScraper:
         self.max_results = max_results
         self.extracted_count = 0
         self.contacts_found = 0
+        self.seen_links = set()
+        self.batch_size = 20  # Process links in batches
         
         self.phone_patterns = [
             re.compile(r'\+?1?[-.]\s?\(?([0-9]{3})\)?[-.]\s?([0-9]{3})[-.]\s?([0-9]{4})'),
@@ -48,11 +50,14 @@ class OptimizedGoogleMapsScraper:
         # Performance-optimized options
         options = [
             "--headless=new",
-            "--no-sandbox", 
+            "--no-sandbox",
             "--disable-dev-shm-usage",
             "--disable-gpu",
             "--disable-extensions",
-            "--disable-images",  # Faster loading
+            "--disable-images",
+            "--disable-javascript",  # Faster page loads
+            "--blink-settings=imagesEnabled=false",
+            "--disable-blink-features=AutomationControlled",
             "--window-size=1920,1080",
             "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         ]
@@ -70,20 +75,38 @@ class OptimizedGoogleMapsScraper:
         print("✅ Browser setup completed")
 
     def search_and_extract_links(self):
-        """Optimized search with guaranteed 20+ results"""
+        """Optimized search with faster execution"""
         try:
             print(f"🔍 Searching for: {self.search_query}")
             
-            # Primary search URL
-            search_url = f"https://www.google.com/maps/search/{self.search_query.replace(' ', '+')}"
-            self.driver.get(search_url)
-            time.sleep(8)
+            # Multiple search URL strategies
+            search_queries = [
+                f"https://www.google.com/maps/search/{self.search_query.replace(' ', '+')}",
+                f"https://www.google.com/maps/search/{self.search_query.replace(' ', '%20')}",
+                f"https://www.google.com/maps/search/{'+'.join(self.search_query.split())}"
+            ]
             
-            # Handle consent
-            self._handle_consent()
+            all_links = set()
             
-            # Extract links with optimized scrolling
-            all_links = self._extract_links_optimized()
+            for url in search_queries:
+                if len(all_links) >= self.max_results:
+                    break
+                    
+                try:
+                    self.driver.get(url)
+                    time.sleep(2)  # Reduced initial wait
+                    self._handle_consent()
+                    
+                    # Extract links with optimized scrolling
+                    new_links = self._extract_links_optimized()
+                    all_links.update(new_links)
+                    
+                    if len(all_links) >= self.max_results:
+                        break
+                        
+                except Exception as e:
+                    print(f"⚠️ Attempt failed: {e}")
+                    continue
             
             print(f"✅ Found {len(all_links)} business links")
             return list(all_links)[:self.max_results]
@@ -115,18 +138,18 @@ class OptimizedGoogleMapsScraper:
             pass
 
     def _extract_links_optimized(self):
-        """Optimized link extraction with 200 scroll attempts"""
+        """Faster link extraction with optimized scrolling"""
         all_links = set()
         scroll_count = 0
-        max_scrolls = 200  # Aggressive scrolling
+        max_scrolls = 50  # Reduced from 200
         patience = 0
-        max_patience = 30
+        max_patience = 15  # Reduced from 30
         
-        # Comprehensive selectors for business links
+        # Optimized selectors for business links (most common first)
         selectors = [
             '//a[contains(@href, "/maps/place/")]',
-            '//div[@role="article"]//a[contains(@href, "/maps/place/")]',
             '//div[contains(@class, "Nv2PK")]//a[contains(@href, "/maps/place/")]',
+            '//div[@role="article"]//a[contains(@href, "/maps/place/")]',
             '//div[contains(@class, "bfdHYd")]//a[contains(@href, "/maps/place/")]',
             '//div[contains(@class, "lI9IFe")]//a[contains(@href, "/maps/place/")]'
         ]
@@ -134,21 +157,40 @@ class OptimizedGoogleMapsScraper:
         while scroll_count < max_scrolls and len(all_links) < self.max_results:
             print(f"🔄 Scroll {scroll_count + 1}/{max_scrolls} - Found: {len(all_links)} links")
             
-            # Extract links
+            # Faster link extraction with batch processing
             new_count = 0
-            for selector in selectors:
-                try:
-                    elements = self.driver.find_elements(By.XPATH, selector)
-                    for element in elements:
-                        try:
-                            href = element.get_attribute('href')
-                            if href and '/maps/place/' in href and href not in all_links:
-                                all_links.add(href)
-                                new_count += 1
-                        except:
-                            continue
-                except:
-                    continue
+            try:
+                # Try to get all links in one go
+                elements = self.driver.find_elements(By.XPATH, '//a[contains(@href, "/maps/place/")]')
+                for element in elements[-50:]:  # Only check most recent elements
+                    try:
+                        href = element.get_attribute('href')
+                        if href and '/maps/place/' in href and href not in all_links and href not in self.seen_links:
+                            all_links.add(href)
+                            self.seen_links.add(href)
+                            new_count += 1
+                            if len(all_links) >= self.max_results:
+                                return all_links
+                    except:
+                        continue
+                
+                # Fallback to individual selectors if needed
+                if new_count == 0:
+                    for selector in selectors[1:]:  # Skip first selector as we already tried it
+                        elements = self.driver.find_elements(By.XPATH, selector)
+                        for element in elements[-20:]:  # Only check most recent elements
+                            try:
+                                href = element.get_attribute('href')
+                                if href and '/maps/place/' in href and href not in all_links and href not in self.seen_links:
+                                    all_links.add(href)
+                                    self.seen_links.add(href)
+                                    new_count += 1
+                                    if len(all_links) >= self.max_results:
+                                        return all_links
+                            except:
+                                continue
+            except Exception as e:
+                print(f"⚠️ Error extracting links: {e}")
             
             # Check progress
             if new_count == 0:
@@ -159,44 +201,42 @@ class OptimizedGoogleMapsScraper:
             else:
                 patience = 0
             
-            # Optimized scrolling
+            # Faster scrolling with dynamic delays
             self._scroll_optimized()
             
-            # Dynamic delay based on results found
-            delay = 1.0 if new_count > 0 else 2.0
+            # Dynamic delay - shorter when finding results
+            delay = 0.3 if new_count > 0 else 0.8
             time.sleep(delay)
             scroll_count += 1
+            
+            # Early exit if we have enough results
+            if len(all_links) >= self.max_results:
+                break
         
         return all_links
 
     def _scroll_optimized(self):
-        """Optimized scrolling method"""
+        """Faster scrolling implementation"""
         try:
-            # Method 1: Scroll results panel
-            panel_selectors = ['[role="main"]', '.m6QErb', '#pane']
-            
-            for selector in panel_selectors:
-                try:
-                    panel = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    # Multiple scroll actions
-                    for _ in range(3):
-                        self.driver.execute_script("arguments[0].scrollTop += 1000", panel)
-                        time.sleep(0.3)
-                    return
-                except:
-                    continue
-            
-            # Method 2: Fallback page scroll
-            self.driver.execute_script("window.scrollBy(0, 1000);")
-            time.sleep(0.5)
-            
-            # Method 3: Keyboard scroll
+            # Try to find and scroll the results panel
             try:
-                body = self.driver.find_element(By.TAG_NAME, "body")
-                body.send_keys(Keys.PAGE_DOWN)
-                body.send_keys(Keys.PAGE_DOWN)
+                # Most common panel selector first
+                panel = self.driver.find_element(By.CSS_SELECTOR, '[role="main"]')
+                self.driver.execute_script("arguments[0].scrollTop = arguments[0].scrollTop + 1500;", panel)
+                return
             except:
                 pass
+                
+            # Fallback to window scroll
+            self.driver.execute_script("window.scrollBy(0, 1000);")
+            
+            # Occasionally use keyboard scroll to trigger lazy loading
+            if random.random() > 0.8:  # 20% chance
+                try:
+                    body = self.driver.find_element(By.TAG_NAME, "body")
+                    body.send_keys(Keys.PAGE_DOWN)
+                except:
+                    pass
                 
         except Exception as e:
             print(f"⚠️ Scroll error: {e}")
@@ -419,7 +459,7 @@ def optimized_scrape_google_maps(query, max_results=50):
 
 if __name__ == "__main__":
     # Test the optimized scraper
-    results = optimized_scrape_google_maps("restaurants in New York", max_results=30)
+    results = optimized_scrape_google_maps("restaurants in New York", max_results=100)
     
     print(f"\n📋 FINAL RESULTS: {len(results)} businesses found")
     
