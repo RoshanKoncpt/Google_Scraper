@@ -8,6 +8,7 @@ import os
 import subprocess
 import re
 import json
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
@@ -19,7 +20,7 @@ from selenium.common.exceptions import WebDriverException, TimeoutException, NoS
 
 
 class GoogleMapsBusinessScraper:
-    def __init__(self, query, location, max_results=30, headless=False, min_results=10):
+    def __init__(self, query, location, max_results=30, headless=False, min_results=10, debug_dir="debug_evidence"):
         self.query = query
         self.location = location  # Specific location to search in
         self.max_results = max_results
@@ -27,7 +28,40 @@ class GoogleMapsBusinessScraper:
         self.driver = None
         self.results = []
         self.headless = headless
+        self.debug_dir = debug_dir
+        self.setup_debug_directory()
         self.setup_browser()
+
+    def setup_debug_directory(self):
+        """Create directory for debug evidence"""
+        if not os.path.exists(self.debug_dir):
+            os.makedirs(self.debug_dir)
+        print(f"📁 Debug evidence will be saved to: {self.debug_dir}")
+
+    def capture_evidence(self, name, page_source=False):
+        """Capture screenshot and optionally page source"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Capture screenshot
+        screenshot_path = os.path.join(self.debug_dir, f"{name}_{timestamp}.png")
+        try:
+            self.driver.save_screenshot(screenshot_path)
+            print(f"📸 Saved screenshot: {screenshot_path}")
+        except Exception as e:
+            print(f"❌ Failed to save screenshot: {e}")
+
+        # Capture page source if requested
+        if page_source:
+            page_source_path = os.path.join(self.debug_dir, f"{name}_{timestamp}.html")
+            try:
+                with open(page_source_path, 'w', encoding='utf-8') as f:
+                    f.write(self.driver.page_source)
+                print(f"📄 Saved page source: {page_source_path}")
+                return len(self.driver.page_source)
+            except Exception as e:
+                print(f"❌ Failed to save page source: {e}")
+
+        return 0
 
     def get_chrome_version(self):
         """Get the installed Chrome version"""
@@ -230,12 +264,18 @@ class GoogleMapsBusinessScraper:
             self.driver.get(location_url)
             time.sleep(5)
 
+            # Capture evidence after page load
+            self.capture_evidence("after_location_load", page_source=True)
+
             # Now search for the query within this location
             print(f"🔍 Searching for '{self.query}' in {self.location}")
             self.enter_search_query()
 
             # Wait for results to load
             time.sleep(5)
+
+            # Capture evidence after search
+            self.capture_evidence("after_search_load", page_source=True)
 
             # Accept cookies if prompted (for EU users)
             try:
@@ -265,11 +305,7 @@ class GoogleMapsBusinessScraper:
         except Exception as e:
             print(f"❌ Error during search: {e}")
             # Take screenshot for debugging
-            try:
-                self.driver.save_screenshot("error_screenshot.png")
-                print("📸 Saved screenshot as error_screenshot.png")
-            except:
-                pass
+            self.capture_evidence("error", page_source=True)
 
     def enter_search_query(self):
         """Enter the search query in the search box within the location"""
@@ -294,7 +330,7 @@ class GoogleMapsBusinessScraper:
             time.sleep(5)
 
     def scroll_for_more_results(self):
-        """Improved scrolling with auto-detection of scrollable elements"""
+        """Improved scrolling with auto-detection of scrollable elements and evidence capture"""
         print("🔄 Scrolling to load more results...")
 
         # Try multiple selectors for scroll container
@@ -325,6 +361,9 @@ class GoogleMapsBusinessScraper:
         max_scroll_attempts = 50  # Reduced for location-specific searches
         no_new_results_count = 0
         max_no_new_results = 5  # Reduced for location-specific searches
+
+        # Capture initial state
+        initial_source_length = self.capture_evidence("before_scroll", page_source=True)
 
         while (scroll_attempts < max_scroll_attempts and
                len(self.results) < self.max_results and
@@ -424,6 +463,18 @@ class GoogleMapsBusinessScraper:
             # Occasionally try to find more elements
             if no_new_results_count % 3 == 0:
                 self.find_hidden_elements()
+
+        # Capture final state after scrolling
+        final_source_length = self.capture_evidence("after_scroll", page_source=True)
+
+        # Compare page source lengths
+        if initial_source_length > 0 and final_source_length > 0:
+            length_diff = final_source_length - initial_source_length
+            print(f"📊 Page source length changed by: {length_diff} characters")
+            if length_diff > 1000:
+                print("✅ Significant content was loaded during scrolling")
+            else:
+                print("⚠️ Little to no new content was loaded during scrolling")
 
     def find_hidden_elements(self):
         """Try to find hidden or lazy-loaded elements"""
@@ -812,6 +863,7 @@ class GoogleMapsBusinessScraper:
                     close_buttons[0].click()
                 time.sleep(1)
             except:
+                # If we can't find close button, try going back
                 self.driver.execute_script("window.history.back()")
                 time.sleep(1)
 
@@ -893,8 +945,9 @@ class GoogleMapsBusinessScraper:
             print("🔚 Browser closed")
 
 
-def scrape_google_maps(query, location, max_results=30, headless=False, resume=False, min_results=10):
-    scraper = GoogleMapsBusinessScraper(query, location, max_results, headless, min_results)
+def scrape_google_maps(query, location, max_results=30, headless=False, resume=False, min_results=10,
+                       debug_dir="debug_evidence"):
+    scraper = GoogleMapsBusinessScraper(query, location, max_results, headless, min_results, debug_dir)
 
     # Try to resume from previous progress
     if resume:
@@ -907,8 +960,8 @@ def scrape_google_maps(query, location, max_results=30, headless=False, resume=F
 
 if __name__ == "__main__":
     print("🚀 Starting Google Maps scraper...")
-    query = "Restaurants "
-    location = "Gandhinagar"
+    query = "restaurants"
+    location = "Manhattan, New York"
     results = scrape_google_maps(query, location, max_results=20, headless=False, resume=False, min_results=10)
     print("\n📋 Final Results:")
     for i, result in enumerate(results, 1):
