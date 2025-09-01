@@ -503,7 +503,7 @@ async def test_google_maps_scraper():
 
 
 @app.get("/scrape")
-async def scrape_google_maps_get(query: str = "coffee shops", max_results: int = 5):
+async def scrape_google_maps_get(query: str = "church", max_results: int = 15):
     """
     GET endpoint for Google Maps scraping (for testing)
     """
