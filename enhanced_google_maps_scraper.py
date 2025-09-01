@@ -27,10 +27,12 @@ from webdriver_manager.chrome import ChromeDriverManager
 class EnhancedGoogleMapsBusinessScraper:
     def __init__(self, search_query, max_results=100, visit_websites=True):
         self.search_query = search_query
-        self.max_results = max_results
+        self.max_results = min(max_results, 100)  # Cap max results for performance
         self.visit_websites = visit_websites
         self.extracted_count = 0
         self.contacts_found = 0
+        self.driver = None
+        self.wait = None
         
         # Enhanced email and phone patterns
         self.email_patterns = [
@@ -110,12 +112,18 @@ class EnhancedGoogleMapsBusinessScraper:
         try:
             print(f"🔍 Enhanced search for: {self.search_query}")
 
-            # Strategy 1: Direct search with enhanced URL
-            search_url = f"https://www.google.com/maps/search/{self.search_query.replace(' ', '+')}"
+            # Direct search with enhanced URL and parameters
+            search_url = f"https://www.google.com/maps/search/{self.search_query.replace(' ', '+')}?hl=en&gl=us"
             print(f"🌐 Navigating to: {search_url}")
 
+            self.driver.set_page_load_timeout(20)
+            self.driver.set_script_timeout(20)
             self.driver.get(search_url)
-            time.sleep(10)  # Longer initial wait
+            
+            # More efficient initial wait
+            WebDriverWait(self.driver, 15).until(
+                EC.presence_of_element_located((By.XPATH, "//div[@role='main']"))
+            )
 
             # Handle consent/cookies more aggressively
             self._handle_consent_and_cookies()
@@ -131,127 +139,173 @@ class EnhancedGoogleMapsBusinessScraper:
             return False
 
     def _handle_consent_and_cookies(self):
-        """Enhanced consent and cookie handling"""
+        """Ultra-fast consent handling with minimal delays"""
         try:
-            print("🍪 Handling consent and cookies...")
+            # Use JavaScript to handle consent (faster than Selenium clicks)
+            consent_script = """
+            // Try to find and click any consent button
+            const clickButton = (selectors) => {
+                for (const selector of selectors) {
+                    try {
+                        const btn = document.evaluate(selector, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                        if (btn && btn.offsetParent !== null) {
+                            btn.click();
+                            return true;
+                        }
+                    } catch(e) {}
+                }
+                return false;
+            };
             
-            # Extended consent selectors (multiple languages)
+            const buttons = [
+                '//button[contains(translate(., "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"), "accept")]',
+                '//button[contains(., "✓")]',
+                '//button[contains(., "OK")]',
+                '//button[contains(., "Got it")]',
+                '//button[contains(., "Continue")]',
+                '//button[contains(@class, "VfPpkd")]',
+                '//button[contains(@class, "lssxud")]',
+                '//button[not(@disabled)]',
+                '//button[1]'
+            ];
+            
+            return clickButton(buttons);
+            """
+            
+            # Execute with minimal timeout
+            self.driver.set_script_timeout(2)
+            result = self.driver.execute_script(consent_script)
+            
+            if result:
+                print("✅ Consent handled (fast path)")
+                return
+                
+            # Fallback to Selenium method if JS method failed
             consent_selectors = [
-                "//button[contains(text(), 'Accept all')]",
-                "//button[contains(text(), 'I agree')]",
-                "//button[contains(text(), 'Accept')]",
-                "//button[contains(text(), 'Alles accepteren')]",
-                "//button[contains(text(), 'Accepteren')]",
-                "//button[contains(text(), 'Tout accepter')]",
-                "//button[contains(text(), 'Aceptar todo')]",
-                "//div[contains(@class, 'VfPpkd-LgbsSe')]//parent::button",
-                "//button[contains(@class, 'VfPpkd-LgbsSe')]",
-                "//form//button[@type='submit']",
-                "//button[not(@disabled)]"
+                "//button[contains(., 'Accept all')]",
+                "//button[contains(., 'I agree')]",
+                "//button[contains(., 'Accept')]",
+                "//button[contains(@class, 'VfPpkd-LgbsSe')]"
             ]
-
+            
             for selector in consent_selectors:
                 try:
-                    button = WebDriverWait(self.driver, 3).until(
+                    button = WebDriverWait(self.driver, 1).until(
                         EC.element_to_be_clickable((By.XPATH, selector))
                     )
-                    button.click()
-                    print("✅ Consent handled")
-                    time.sleep(3)
+                    self.driver.execute_script("arguments[0].click();", button)
+                    print("✅ Consent handled (fallback)")
+                    time.sleep(0.5)  # Minimal delay after click
                     break
                 except:
                     continue
-
+                    
         except Exception as e:
             print(f"⚠️ Consent handling: {e}")
 
     def _wait_for_search_results(self):
-        """Enhanced waiting for search results"""
+        """Optimized waiting for search results"""
         print("⏳ Waiting for search results...")
         
-        # Multiple result indicators
+        # Optimized result indicators (reduced to most common selectors)
         result_selectors = [
             "//div[contains(@class, 'Nv2PK')]",
             "//div[@role='article']",
-            "//a[contains(@href, '/maps/place/')]",
-            "//div[contains(@class, 'bfdHYd')]",
-            "//div[contains(@class, 'lI9IFe')]",
-            "//div[contains(@jsaction, 'mouseover')]",
-            "//div[contains(@class, 'THOPZb')]",
-            "//div[contains(@class, 'VkpGBb')]"
+            "//a[contains(@href, '/maps/place/')]"
         ]
 
-        max_wait = 30
-        wait_count = 0
-        
-        while wait_count < max_wait:
+        # Use WebDriverWait with expected conditions for better performance
+        try:
+            WebDriverWait(self.driver, 15).until(
+                lambda d: any(d.find_elements(By.XPATH, selector) for selector in result_selectors)
+            )
+            elements = []
             for selector in result_selectors:
-                try:
-                    elements = self.driver.find_elements(By.XPATH, selector)
-                    if elements and len(elements) > 0:
-                        print(f"✅ Found {len(elements)} results with selector")
-                        return True
-                except:
-                    continue
+                elements = self.driver.find_elements(By.XPATH, selector)
+                if elements:
+                    print(f"✅ Found {len(elements)} results")
+                    return True
+        except TimeoutException:
+            print("⚠️ Timeout waiting for results, but continuing...")
             
-            time.sleep(1)
-            wait_count += 1
-            
-        print("⚠️ No clear results found, but continuing...")
         return True
 
     def get_business_links(self):
-        """Enhanced business link extraction with aggressive scrolling"""
+        """Ultra-fast business link extraction with optimized performance"""
         try:
-            print("📋 Enhanced business link extraction...")
+            print("🚀 Starting ultra-fast link extraction...")
             all_links = set()
             scroll_attempts = 0
-            max_scrolls = 200  # Increased from 100 to 200 for more thorough scraping
+            max_scrolls = min(50, max(20, self.max_results))  # More dynamic scroll limit
             no_new_content_count = 0
-            max_patience = 25  # Increased from 15 to 25 for more patience
+            max_patience = 8  # Even more aggressive patience
 
-            # Comprehensive link selectors - updated with more recent Google Maps selectors
+            # Ultra-optimized link selectors (prioritized by speed and reliability)
             link_selectors = [
-                '//a[contains(@href, "/maps/place/")]',
-                '//div[@role="article"]//a[contains(@href, "/maps/place/")]',
-                '//div[contains(@class, "Nv2PK")]//a[contains(@href, "/maps/place/")]',
-                '//div[contains(@class, "bfdHYd")]//a[contains(@href, "/maps/place/")]',
-                '//div[contains(@class, "lI9IFe")]//a[contains(@href, "/maps/place/")]',
-                '//div[contains(@jsaction, "mouseover")]//a[contains(@href, "/maps/place/")]',
-                '//div[contains(@class, "THOPZb")]//a[contains(@href, "/maps/place/")]',
-                '//div[contains(@class, "VkpGBb")]//a[contains(@href, "/maps/place/")]',
-                '//div[contains(@class, "UaQhfb")]//a[contains(@href, "/maps/place/")]',
-                '//div[contains(@class, "section-result")]//a[contains(@href, "/maps/place/")]',
-                '//div[contains(@class, "Nv2PK")]//a[contains(@href, "/maps/place/")]',
-                '//div[contains(@class, "qBF1Pd")]//a[contains(@href, "/maps/place/")]',
-                '//div[contains(@class, "hfpxzc")]',  # New Google Maps card selector
-                '//div[contains(@class, "lI9IFe")]//a[contains(@href, "/maps/place/")]',
-                '//div[contains(@class, "m6QErb")]//a[contains(@href, "/maps/place/")]',
-                '//div[contains(@class, "Nv2PK")]//a[contains(@href, "/maps/place/")]',
-                '//div[contains(@class, "bfdHYd")]//a[contains(@href, "/maps/place/")]',
-                '//div[contains(@class, "VkpGBb")]//a[contains(@href, "/maps/place/")]',
-                '//div[contains(@class, "qBF1Pd")]//a[contains(@href, "/maps/place/")]',
-                '//div[contains(@class, "hfpxzc")]'  # New Google Maps card selector
+                '//div[contains(@class, "Nv2PK")]//a[contains(@href, "/maps/place/")]',  # Primary
+                '//div[@role="article"]//a[contains(@href, "/maps/place/")][1]',  # First article
+                '//div[contains(@class, "hfpxzc")]//a[contains(@href, "/maps/place/")]',  # New cards
+                '//a[contains(@href, "/maps/place/")][1]'  # First fallback
             ]
 
             while scroll_attempts < max_scrolls and len(all_links) < self.max_results:
                 print(f"🔄 Enhanced scroll {scroll_attempts + 1}/{max_scrolls}")
 
-                # Extract links with all selectors
+                # Ultra-fast link extraction with batched processing
                 new_links_count = 0
-                for selector in link_selectors:
+                try:
+                    # Use JavaScript for faster link extraction
+                    extract_script = """
+                    const links = new Set();
+                    const selectors = [
+                        'div.Nv2PK a[href*="/maps/place/"]',
+                        'div[role="article"] a[href*="/maps/place/"]',
+                        'div.hfpxzc',
+                        'a[href*="/maps/place/"]'
+                    ];
+                    
+                    // Find all matching elements
+                    selectors.forEach(selector => {
+                        document.querySelectorAll(selector).forEach(el => {
+                            const href = el.href || el.getAttribute('href');
+                            if (href && href.includes('/maps/place/')) {
+                                links.add(href.split('?')[0]); // Remove URL parameters
+                            }
+                        });
+                    });
+                    
+                    return Array.from(links);
+                    """
+                    
+                    # Execute extraction script
+                    self.driver.set_script_timeout(2)
+                    links = self.driver.execute_script(extract_script) or []
+                    
+                    # Process found links
+                    for href in links:
+                        if href and href not in all_links:
+                            all_links.add(href)
+                            new_links_count += 1
+                            if len(all_links) >= self.max_results:
+                                break
+                                    
+                except Exception as e:
+                    print(f"⚠️ Fast link extraction error: {e}")
+                    # Fallback to Selenium method if JS fails
                     try:
-                        link_elements = self.driver.find_elements(By.XPATH, selector)
-                        for element in link_elements:
+                        elements = self.driver.find_elements(By.XPATH, '//a[contains(@href, "/maps/place/")]')
+                        for el in elements[:50]:  # Limit to first 50 elements
                             try:
-                                href = element.get_attribute('href')
+                                href = el.get_attribute('href')
                                 if href and '/maps/place/' in href and href not in all_links:
                                     all_links.add(href)
                                     new_links_count += 1
+                                    if len(all_links) >= self.max_results:
+                                        break
                             except:
                                 continue
-                    except:
-                        continue
+                    except Exception as e2:
+                        print(f"⚠️ Fallback extraction failed: {e2}")
 
                 current_count = len(all_links)
                 progress = (current_count / self.max_results) * 100 if self.max_results > 0 else 0
@@ -285,12 +339,23 @@ class EnhancedGoogleMapsBusinessScraper:
                 # Enhanced scrolling strategy
                 self._enhanced_scroll()
                 
-                # More aggressive delay strategy
+                # Ultra-fast delay strategy
                 if new_links_count > 0:
-                    delay = random.uniform(1, 2)  # Faster when finding results
+                    delay = random.uniform(0.1, 0.5)  # Much faster when finding results
                 else:
-                    delay = random.uniform(3, 5)  # Slower when stuck
+                    delay = random.uniform(0.5, 1.0)  # Reduced delay when stuck
+                
+                # Process any pending events
+                try:
+                    self.driver.execute_script("return 1;")  # Keep connection alive
+                except:
+                    pass
+                    
                 time.sleep(delay)
+                
+                # Early exit if we have enough links
+                if len(all_links) >= self.max_results:
+                    break
                 
                 scroll_attempts += 1
 
@@ -310,32 +375,63 @@ class EnhancedGoogleMapsBusinessScraper:
             return []
 
     def _enhanced_scroll(self):
-        """Enhanced scrolling with multiple methods"""
+        """Ultra-fast scrolling with optimized performance"""
         try:
-            # Method 1: Scroll results panel
-            scrollable_selectors = [
-                '[role="main"]',
-                '.m6QErb',
-                '#pane',
-                '.siAUzd',
-                '.section-scrollbox',
-                '.section-layout',
-                '.section-listbox',
-                '.section-result-container'
-            ]
-
-            scrolled = False
-            for selector in scrollable_selectors:
-                try:
-                    panel = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    # Multiple scroll actions per attempt
-                    for _ in range(3):
-                        self.driver.execute_script("arguments[0].scrollTop += 800", panel)
-                        time.sleep(0.5)
-                    scrolled = True
-                    break
-                except:
-                    continue
+            # Single efficient scroll script with multiple fallbacks
+            scroll_script = """
+            // Try multiple scroll strategies
+            function scrollPage() {
+                // Try main scroll container first
+                const containers = [
+                    document.querySelector('div.m6QErb.DxyBCb.kA9KIf.dS8AEf.ecceSd > div.m6QErb.DxyBCb.kA9KIf.dS8AEf.tLjsW'),
+                    document.querySelector('div.e07Vkf.kA9KIf'),
+                    document.documentElement,
+                    document.body
+                ];
+                
+                // Find first valid container
+                const target = containers.find(el => el && el.scrollHeight > 0) || window;
+                
+                // Calculate scroll amount (larger scrolls for faster loading)
+                const scrollAmount = Math.max(
+                    1000,
+                    Math.min(2000, target.scrollHeight * 0.3)  // Scroll 30% of container height
+                );
+                
+                // Smooth scroll to trigger lazy loading
+                target.scrollBy({
+                    top: scrollAmount,
+                    behavior: 'smooth'
+                });
+                
+                return true;
+            }
+            
+            return scrollPage();
+            """
+            
+            # Execute scroll with minimal timeout
+            self.driver.set_script_timeout(1.5)
+            self.driver.execute_script(scroll_script)
+            
+            # Tiny delay to allow content to load
+            time.sleep(0.15)
+            
+        except Exception as e:
+            # Ultra-fast fallback
+            self.driver.execute_script("window.scrollBy(0, 1500);")
+            time.sleep(0.5)
+            # Body scroll
+            self.driver.execute_script("document.body.scrollTop += 1000")
+            time.sleep(0.5)
+            # Try to find and scroll any scrollable div
+            try:
+                scrollable_divs = self.driver.find_elements(By.CSS_SELECTOR, "div[style*='overflow']")
+                for div in scrollable_divs[:3]:
+                    self.driver.execute_script("arguments[0].scrollTop += 500", div)
+                    time.sleep(0.3)
+            except:
+                pass
 
             # Method 2: Fallback scrolling
             if not scrolled:
