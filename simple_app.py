@@ -175,37 +175,18 @@ async def debug_scrape():
             scraper.setup_browser()
             debug_info["step_3_browser_setup"] = "✅ Browser setup successful"
 
-            # Test search
+            # Test search and link extraction in one step
             try:
-                search_result = scraper.search_google_maps()
-                if search_result:
-                    debug_info["step_4_search"] = "✅ Google Maps search successful"
-
-                    # Test link extraction
-                    try:
-                        links = scraper.get_business_links()
-                        debug_info["step_5_links"] = f"✅ Found {len(links)} business links"
-
-                        if links:
-                            # Test data extraction from first link
-                            try:
-                                data = scraper.extract_business_data(links[0])
-                                if data and data.get('name') != 'Unknown Business':
-                                    debug_info["step_6_extraction"] = f"✅ Successfully extracted: {data['name']}"
-                                else:
-                                    debug_info["step_6_extraction"] = "❌ Data extraction failed or returned empty"
-                            except Exception as e:
-                                debug_info["step_6_extraction"] = f"❌ Data extraction error: {str(e)}"
-                                debug_info["errors"].append(f"Data extraction: {str(e)}")
-                        else:
-                            debug_info["step_5_links"] = "❌ No business links found"
-
-                    except Exception as e:
-                        debug_info["step_5_links"] = f"❌ Link extraction error: {str(e)}"
-                        debug_info["errors"].append(f"Link extraction: {str(e)}")
-
+                links = scraper.search_and_extract_links()
+                if links:
+                    debug_info["step_4_search"] = f"✅ Google Maps search successful, found {len(links)} results"
+                    debug_info["step_5_links"] = f"✅ Extracted {len(links)} business links"
+                    
+                    # Show sample of first result
+                    if links:
+                        debug_info["step_6_extraction"] = f"✅ First result: {links[0] if isinstance(links[0], str) else links[0].get('name', 'Unknown')}"
                 else:
-                    debug_info["step_4_search"] = "❌ Google Maps search failed"
+                    debug_info["step_4_search"] = "❌ Google Maps search returned no results"
 
             except Exception as e:
                 debug_info["step_4_search"] = f"❌ Search error: {str(e)}"
