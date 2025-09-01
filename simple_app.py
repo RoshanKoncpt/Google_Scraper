@@ -273,7 +273,7 @@ async def debug_search():
                     # Test search attempt
                     try:
                         print("🔍 Testing search functionality...")
-                        search_result = scraper.search_google_maps()
+                        search_result = scraper.search_and_extract_links()
 
                         if search_result:
                             debug_info["search_attempt"] = "✅ Search method returned True"
