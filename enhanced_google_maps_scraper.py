@@ -25,14 +25,17 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 
 class EnhancedGoogleMapsBusinessScraper:
-    def __init__(self, search_query, max_results=100, visit_websites=True):
+    def __init__(self, search_query, max_results=10, visit_websites=True):
         self.search_query = search_query
-        self.max_results = min(max_results, 100)  # Cap max results for performance
+        self.max_results = max_results
         self.visit_websites = visit_websites
+        self.results = []
         self.extracted_count = 0
-        self.contacts_found = 0
+        self.chrome_options = Options()
         self.driver = None
         self.wait = None
+        self.max_retries = 3
+        self.retry_delay = 2
         
         # Enhanced email and phone patterns
         self.email_patterns = [
@@ -59,13 +62,64 @@ class EnhancedGoogleMapsBusinessScraper:
             re.compile(r'\b(?:0|\+?91[\s-]?)?[6-9]\d{9}\b')
         ]
         
-        self.setup_browser()
+        self._setup_browser()
     
-    def setup_browser(self):
-        """Enhanced browser setup with better stability"""
-        print("🔧 Setting up enhanced Chrome browser...")
-
+    def _setup_browser(self):
+        """Setup Chrome browser with enhanced options and memory management"""
+        print("🛠️ Setting up enhanced browser with crash protection...")
+        
         self.chrome_options = Options()
+        
+        # Memory and performance optimizations
+        self.chrome_options.add_argument('--disable-dev-shm-usage')
+        self.chrome_options.add_argument('--no-sandbox')
+        self.chrome_options.add_argument('--disable-gpu')
+        self.chrome_options.add_argument('--disable-software-rasterizer')
+        self.chrome_options.add_argument('--disable-features=IsolateOrigins,site-per-process')
+        self.chrome_options.add_argument('--disable-site-isolation-trials')
+        self.chrome_options.add_argument('--disable-web-security')
+        self.chrome_options.add_argument('--disable-background-timer-throttling')
+        self.chrome_options.add_argument('--disable-renderer-backgrounding')
+        self.chrome_options.add_argument('--disable-backgrounding-occluded-windows')
+        self.chrome_options.add_argument('--disable-ipc-flooding-protection')
+        self.chrome_options.add_argument('--disable-hang-monitor')
+        self.chrome_options.add_argument('--disable-breakpad')
+        self.chrome_options.add_argument('--disable-crash-reporter')
+        self.chrome_options.add_argument('--disable-crashpad')
+        self.chrome_options.add_argument('--js-flags=--max-old-space-size=512')
+        
+        # Disable features that can cause crashes
+        self.chrome_options.add_argument('--disable-accelerated-2d-canvas')
+        self.chrome_options.add_argument('--disable-accelerated-jpeg-decoding')
+        self.chrome_options.add_argument('--disable-accelerated-mjpeg-decode')
+        self.chrome_options.add_argument('--disable-accelerated-video-decode')
+        self.chrome_options.add_argument('--disable-features=ScriptStreaming')
+        self.chrome_options.add_argument('--disable-gpu-early-init')
+        self.chrome_options.add_argument('--disable-threaded-animation')
+        self.chrome_options.add_argument('--disable-threaded-scrolling')
+        self.chrome_options.add_argument('--disable-v8-idle-tasks')
+        self.chrome_options.add_argument('--disable-webgl')
+        self.chrome_options.add_argument('--disable-webgl2')
+        
+        # Headless mode settings
+        self.chrome_options.add_argument('--headless=new')
+        self.chrome_options.add_argument('--window-size=1920,1080')
+        
+        # Memory management
+        self.chrome_options.add_argument('--disable-dev-shm-usage')
+        self.chrome_options.add_argument('--no-zygote')
+        self.chrome_options.add_argument('--single-process')
+        
+        # Disable extensions and automation detection
+        self.chrome_options.add_argument('--disable-extensions')
+        self.chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+        
+        # Language and encoding
+        self.chrome_options.add_argument('--lang=en-US')
+        self.chrome_options.add_argument('--accept-lang=en-US,en')
+        
+        # User agent
+        self.chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         
         # Enhanced options for better performance and stability
         browser_options = [
@@ -668,23 +722,17 @@ class EnhancedGoogleMapsBusinessScraper:
                 'additional_contacts': ''
             }
 
-            # Enhanced name extraction
-            data['name'] = self._extract_business_name()
+            # Safe extraction of all data with error handling
+            data['name'] = self._safe_extract(self._extract_business_name, 'Not available')
+            data['address'] = self._safe_extract(self._extract_address, 'Address not found')
             
-            # Enhanced address extraction
-            data['address'] = self._extract_address()
+            # Extract rating and reviews safely
+            rating_data = self._safe_extract(self._extract_rating_and_reviews, (None, None))
+            data['rating'], data['review_count'] = rating_data if isinstance(rating_data, tuple) else (None, None)
             
-            # Enhanced rating and reviews
-            data['rating'], data['review_count'] = self._extract_rating_and_reviews()
-            
-            # Enhanced category extraction
-            data['category'] = self._extract_category()
-            
-            # Enhanced website extraction
-            data['website'] = self._extract_website()
-            
-            # Enhanced phone extraction
-            data['mobile'] = self._extract_phone_enhanced()
+            data['category'] = self._safe_extract(self._extract_category, 'Not specified')
+            data['website'] = self._safe_extract(self._extract_website)
+            data['mobile'] = self._safe_extract(self._extract_phone_enhanced)
 
             self.extracted_count += 1
 
