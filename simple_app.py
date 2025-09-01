@@ -524,18 +524,45 @@ async def scrape_google_maps_internal(request: SearchRequest):
     try:
         print(f"🔍 Received scraping request: {request.query}")
         print(f"📊 Max results: {request.max_results}")
+        print(f"🌐 Visit websites: {request.visit_websites}")
 
         # Import the enhanced scraper function
-        from enhanced_google_maps_scraper import enhanced_scrape_google_maps
+        try:
+            from enhanced_google_maps_scraper import enhanced_scrape_google_maps, EnhancedGoogleMapsBusinessScraper
+            print("✅ Successfully imported enhanced scraper modules")
+        except ImportError as e:
+            print(f"❌ Failed to import scraper modules: {str(e)}")
+            raise
 
-        # Run extraction with enhanced scraper
-        print("🚀 Starting enhanced extraction process...")
-        results = enhanced_scrape_google_maps(
-            query=request.query,
-            max_results=request.max_results,
-            visit_websites=request.visit_websites
-        )
-        print(f"✅ Extraction completed. Found {len(results) if results else 0} results")
+        try:
+            # Run extraction with enhanced scraper
+            print("🚀 Starting enhanced extraction process...")
+            
+            # First try with the enhanced_scrape_google_maps function
+            print("🔄 Attempting to use enhanced_scrape_google_maps...")
+            results = enhanced_scrape_google_maps(
+                query=request.query,
+                max_results=request.max_results,
+                visit_websites=request.visit_websites
+            )
+            print(f"✅ enhanced_scrape_google_maps completed. Found {len(results) if results else 0} results")
+            
+            # If no results, try with the class directly
+            if not results or len(results) == 0:
+                print("🔄 No results from enhanced_scrape_google_maps, trying with class directly...")
+                scraper = EnhancedGoogleMapsBusinessScraper(
+                    search_query=request.query,
+                    max_results=request.max_results,
+                    visit_websites=request.visit_websites
+                )
+                results = scraper.run_extraction()
+                print(f"✅ EnhancedGoogleMapsBusinessScraper completed. Found {len(results) if results else 0} results")
+                
+        except Exception as e:
+            print(f"❌ Error during scraping: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
 
         if results and isinstance(results, list) and len(results) > 0:
             # Convert results to BusinessResult objects
