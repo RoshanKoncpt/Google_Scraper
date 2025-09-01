@@ -168,10 +168,23 @@ class EnhancedGoogleMapsBusinessScraper:
                 self.driver.set_page_load_timeout(60)
                 self.driver.set_script_timeout(30)
                 
-                # Clear browser cache and cookies
+                # Clear browser cache and cookies safely
                 self.driver.delete_all_cookies()
-                self.driver.execute_script('window.localStorage.clear();')
-                self.driver.execute_script('window.sessionStorage.clear();')
+                
+                # Only clear storage if we're on a valid URL
+                current_url = self.driver.current_url or ''
+                if current_url and (current_url.startswith('http') or current_url.startswith('https')):
+                    try:
+                        self.driver.execute_script('''
+                            try {
+                                if (window.localStorage) window.localStorage.clear();
+                                if (window.sessionStorage) window.sessionStorage.clear();
+                            } catch(e) {
+                                console.log('Storage clear error:', e);
+                            }
+                        ''')
+                    except Exception as e:
+                        print(f"⚠️ Warning: Could not clear storage: {str(e)}")
                 
                 print(f"✅ Enhanced browser setup completed (Attempt {attempt + 1}/{max_retries})")
                 return
@@ -738,9 +751,12 @@ class EnhancedGoogleMapsBusinessScraper:
         return 'Address not found'
 
     def _extract_rating_and_reviews(self):
-        """Enhanced rating and review extraction"""
+        """Enhanced rating and review extraction with error handling"""
         rating = None
         review_count = None
+        
+        # Add a small delay to ensure elements are loaded
+        time.sleep(0.5)
 
         # Rating selectors
         rating_selectors = [
