@@ -525,12 +525,12 @@ async def scrape_google_maps_internal(request: SearchRequest):
         print(f"🔍 Received scraping request: {request.query}")
         print(f"📊 Max results: {request.max_results}")
 
-        # Import the enhanced scraper function
-        from enhanced_google_maps_scraper import enhanced_scrape_google_maps
+       # Import the optimized scraper function
+        from optimized_scraper import optimized_scrape_google_maps
 
-        # Run extraction with enhanced scraper
-        print("🚀 Starting enhanced extraction process...")
-        results = enhanced_scrape_google_maps(
+        # Run extraction with optimized scraper
+        print("🚀 Starting optimized extraction process...")
+        results = optimized_scrape_google_maps(
             query=request.query,
             max_results=request.max_results,
             visit_websites=request.visit_websites
