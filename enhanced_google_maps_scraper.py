@@ -74,38 +74,123 @@ class EnhancedGoogleMapsBusinessScraper:
             "--disable-dev-shm-usage",
             "--disable-gpu",
             "--disable-extensions",
-            "--disable-plugins",
-            "--disable-images",  # Faster loading
-            "--disable-javascript-harmony-shipping",
+            "--disable-software-rasterizer",
+            "--disable-dev-tools",
+            "--disable-blink-features=AutomationControlled",
+            "--disable-infobars",
+            "--disable-notifications",
+            "--disable-popup-blocking",
+            "--disable-default-apps",
+            "--mute-audio",
+            "--disable-sync",
+            "--disable-translate",
+            "--disable-logging",
+            "--disable-permissions-api",
+            "--disable-background-networking",
+            "--disable-component-update",
+            "--disable-domain-reliability",
+            "--disable-site-isolation-trials",
+            "--disable-web-security",
             "--disable-background-timer-throttling",
             "--disable-renderer-backgrounding",
-            "--disable-backgrounding-occluded-windows",
+            "--disable-hang-monitor",
+            "--no-pings",
+            "--window-size=1920,1080",
             "--disable-ipc-flooding-protection",
-            "--window-size=1920,1080",  # Larger window for more content
+            "--password-store=basic",
+            "--use-mock-keychain",
+            "--disable-breakpad",
+            "--disable-crash-reporter",
+            "--disable-crashpad",
             "--lang=en-US",
             "--accept-lang=en-US,en",
-            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "--js-flags=--max-old-space-size=512",
+            "--disable-accelerated-2d-canvas",
+            "--disable-accelerated-jpeg-decoding",
+            "--disable-accelerated-mjpeg-decode",
+            "--disable-accelerated-video-decode",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-background-timer-throttling",
+            "--disable-features=ScriptStreaming",
+            "--disable-gpu-early-init",
+            "--disable-remote-fonts",
+            "--disable-threaded-animation",
+            "--disable-threaded-scrolling",
+            "--disable-v8-idle-tasks",
+            "--disable-webgl",
+            "--disable-webgl2",
+            "--enable-features=NetworkService,NetworkServiceInProcess",
+            "--force-color-profile=srgb",
+            "--no-first-run",
+            "--no-sandbox-and-elevated"
         ]
         
         for option in browser_options:
             self.chrome_options.add_argument(option)
 
-        # Enhanced preferences
-        self.chrome_options.add_experimental_option('prefs', {
+        # Enhanced preferences with memory optimizations
+        prefs = {
             'intl.accept_languages': 'en-US,en',
             'intl.charset_default': 'UTF-8',
             'profile.default_content_setting_values.notifications': 2,
             'profile.default_content_settings.popups': 0,
-            'profile.managed_default_content_settings.images': 2  # Block images for faster loading
-        })
+            'profile.managed_default_content_settings.images': 2,  # Block images
+            'profile.managed_default_content_settings.javascript': 1,  # Keep JS enabled
+            'profile.managed_default_content_settings.cookies': 2,  # Block cookies
+            'profile.managed_default_content_settings.plugins': 2,  # Block plugins
+            'profile.managed_default_content_settings.geolocation': 2,  # Block geolocation
+            'profile.managed_default_content_settings.media_stream': 2,  # Block media
+            'profile.managed_default_content_settings.popups': 2,  # Block popups
+            'profile.managed_default_content_settings.midi_sysex': 2,  # Block MIDI
+            'profile.managed_default_content_settings.media_stream_mic': 2,  # Block mic
+            'profile.managed_default_content_settings.media_stream_camera': 2,  # Block camera
+            'profile.managed_default_content_settings.protocol_handlers': 2,  # Block protocol handlers
+            'profile.managed_default_content_settings.ppapi_broker': 2,  # Block PPAPI
+            'profile.managed_default_content_settings.automatic_downloads': 2,  # Block auto-downloads
+            'profile.managed_default_content_settings.midi_devices': 2,  # Block MIDI devices
+            'profile.managed_default_content_settings.clipboard': 2,  # Block clipboard
+            'profile.managed_default_content_settings.download_restrictions': 1,  # Safe browsing
+        }
+        self.chrome_options.add_experimental_option('prefs', prefs)
 
-        try:
-            self.driver = webdriver.Chrome(options=self.chrome_options)
-            self.wait = WebDriverWait(self.driver, 20)  # Increased timeout
-            print("✅ Enhanced browser setup completed")
-        except Exception as e:
-            print(f"❌ Browser setup failed: {e}")
-            raise
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                # Add memory management options
+                self.chrome_options.add_argument(f'--js-flags=--max-old-space-size={512 + (attempt * 128)}')
+                
+                # Initialize WebDriver with error handling
+                self.driver = webdriver.Chrome(options=self.chrome_options)
+                self.wait = WebDriverWait(self.driver, 20 + (attempt * 5))  # Increase timeout with retries
+                
+                # Set page load timeout and script timeout
+                self.driver.set_page_load_timeout(60)
+                self.driver.set_script_timeout(30)
+                
+                # Clear browser cache and cookies
+                self.driver.delete_all_cookies()
+                self.driver.execute_script('window.localStorage.clear();')
+                self.driver.execute_script('window.sessionStorage.clear();')
+                
+                print(f"✅ Enhanced browser setup completed (Attempt {attempt + 1}/{max_retries})")
+                return
+                
+            except Exception as e:
+                print(f"❌ Browser setup attempt {attempt + 1} failed: {str(e)}")
+                if hasattr(self, 'driver'):
+                    try:
+                        self.driver.quit()
+                    except:
+                        pass
+                
+                if attempt == max_retries - 1:
+                    print("❌ All browser setup attempts failed")
+                    raise
+                
+                # Wait before retry
+                import time
+                time.sleep(2 ** attempt)  # Exponential backoff
 
     def search_google_maps(self):
         """Enhanced Google Maps search with multiple strategies"""
