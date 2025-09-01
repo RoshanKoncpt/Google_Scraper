@@ -533,7 +533,6 @@ async def scrape_google_maps_internal(request: SearchRequest):
         results = optimized_scrape_google_maps(
             query=request.query,
             max_results=request.max_results,
-            visit_websites=request.visit_websites
         )
         print(f"✅ Extraction completed. Found {len(results) if results else 0} results")
 
