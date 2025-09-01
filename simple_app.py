@@ -502,10 +502,24 @@ async def test_google_maps_scraper():
         }
 
 
-@app.get("/scrape", response_model=SearchResponse)
+@app.get("/scrape")
+async def scrape_google_maps_get(query: str = "coffee shops", max_results: int = 5):
+    """
+    GET endpoint for Google Maps scraping (for testing)
+    """
+    request = SearchRequest(query=query, max_results=max_results)
+    return await scrape_google_maps_internal(request)
+
+@app.post("/scrape", response_model=SearchResponse)
 async def scrape_google_maps(request: SearchRequest):
     """
-    Main Google Maps scraping endpoint using optimized scraper
+    Main Google Maps scraping endpoint using optimized scraper (POST method)
+    """
+    return await scrape_google_maps_internal(request)
+
+async def scrape_google_maps_internal(request: SearchRequest):
+    """
+    Internal function to handle both GET and POST requests
     """
     try:
         print(f"🔍 Received scraping request: {request.query}")
