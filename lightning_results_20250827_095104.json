@@ -1,0 +1,58 @@
+[
+  {
+    "name": "Boucherie Union Square",
+    "mobile": "212-353-0200",
+    "address": "\ue0c8\n225 Park Ave S, New York, NY 10003, United States",
+    "google_maps_url": "https://www.google.com/maps/place/Boucherie+Union+Square/data=!4m7!3m6!1s0x89c259a1ec5f5573:0x2fc6687f46f682d5!8m2!3d40.7372552!4d-73.9882246!16s%2Fg%2F11hbv5rh0_!19sChIJc1Vf7KFZwokR1YL2Rn9oxi8?authuser=0&hl=en&rclk=1",
+    "search_query": "restaurants in New York"
+  },
+  {
+    "name": "Oceana",
+    "mobile": "212-759-5941",
+    "address": "\ue0c8\n120 W 49th St, New York, NY 10020, United States",
+    "google_maps_url": "https://www.google.com/maps/place/Oceana/data=!4m7!3m6!1s0x89c258ff4b8e84df:0x9fb5bdd435e9f5ee!8m2!3d40.759764!4d-73.982307!16s%2Fg%2F1tfn3nh1!19sChIJ34SOS_9YwokR7vXpNdS9tZ8?authuser=0&hl=en&rclk=1",
+    "search_query": "restaurants in New York"
+  },
+  {
+    "name": "The Modern",
+    "mobile": "212-333-1220",
+    "address": "\ue0c8\n9 W 53rd St, New York, NY 10019, United States",
+    "google_maps_url": "https://www.google.com/maps/place/The+Modern/data=!4m7!3m6!1s0x89c258fbc4a06f31:0xb0f62a18b16739cc!8m2!3d40.761081!4d-73.976753!16s%2Fm%2F05yj_8q!19sChIJMW-gxPtYwokRzDlnsRgq9rA?authuser=0&hl=en&rclk=1",
+    "search_query": "restaurants in New York"
+  },
+  {
+    "name": "Upland",
+    "mobile": "212-686-1006",
+    "address": "\ue0c8\n345 Park Ave S, New York, NY 10010, United States",
+    "google_maps_url": "https://www.google.com/maps/place/Upland/data=!4m7!3m6!1s0x89c259a715fb5059:0xe5543b76e952fab3!8m2!3d40.7419313!4d-73.984644!16s%2Fg%2F11btmqg_59!19sChIJWVD7FadZwokRs_pS6XY7VOU?authuser=0&hl=en&rclk=1",
+    "search_query": "restaurants in New York"
+  },
+  {
+    "name": "Piccola Cucina Osteria Siciliana",
+    "mobile": "646-478-7488",
+    "address": "\ue0c8\n196 Spring St, New York, NY 10012, United States",
+    "google_maps_url": "https://www.google.com/maps/place/Piccola+Cucina+Osteria+Siciliana/data=!4m7!3m6!1s0x89c2598c596508a3:0x4bf0f1fff1c0bb82!8m2!3d40.7250308!4d-74.0032774!16s%2Fg%2F1hm6fq399!19sChIJowhlWYxZwokRgrvA8f_x8Es?authuser=0&hl=en&rclk=1",
+    "search_query": "restaurants in New York"
+  },
+  {
+    "name": "Gramercy Tavern",
+    "mobile": "212-477-0777",
+    "address": "\ue0c8\n42 E 20th St, New York, NY 10003, United States",
+    "google_maps_url": "https://www.google.com/maps/place/Gramercy+Tavern/data=!4m7!3m6!1s0x89c259a1820824bd:0x2b79dcdc251b8415!8m2!3d40.7384555!4d-73.9885064!16s%2Fm%2F020dmrk!19sChIJvSQIgqFZwokRFYQbJdzceSs?authuser=0&hl=en&rclk=1",
+    "search_query": "restaurants in New York"
+  },
+  {
+    "name": "Buena Vista Restaurant & Bar",
+    "mobile": "212-388-5040",
+    "address": "\ue0c8\n536 9th Ave, New York, NY 10018, United States",
+    "google_maps_url": "https://www.google.com/maps/place/Buena+Vista+Restaurant+%26+Bar/data=!4m7!3m6!1s0x89c25852b433ffff:0x4bde1e9afa756c9b!8m2!3d40.756837!4d-73.993494!16s%2Fg%2F11fflztctz!19sChIJ__8ztFJYwokRm2x1-poe3ks?authuser=0&hl=en&rclk=1",
+    "search_query": "restaurants in New York"
+  },
+  {
+    "name": "Manhatta",
+    "mobile": "212-230-5788",
+    "address": "\ue0c8\n28 Liberty St 60th floor, New York, NY 10005, United States",
+    "google_maps_url": "https://www.google.com/maps/place/Manhatta/data=!4m7!3m6!1s0x89c25bc797d635a1:0x60b055910436a0a4!8m2!3d40.7079974!4d-74.0088826!16s%2Fg%2F11gh9qhb9q!19sChIJoTXWl8dbwokRpKA2BJFVsGA?authuser=0&hl=en&rclk=1",
+    "search_query": "restaurants in New York"
+  }
+]
