@@ -32,11 +32,18 @@ class OptimizedGoogleMapsScraper:
         self.seen_links = set()
         self.batch_size = 20  # Process links in batches
         
+        # Updated phone number patterns to handle international and Indian formats
         self.phone_patterns = [
-            re.compile(r'\+?1?[-.]\s?\(?([0-9]{3})\)?[-.]\s?([0-9]{3})[-.]\s?([0-9]{4})'),
-            re.compile(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b'),
-            re.compile(r'\(\d{3}\)\s?\d{3}[-.]?\d{4}'),
-            re.compile(r'\d{10}'),
+            # International format with country code (e.g., +91 98765 43210, +1 (123) 456-7890)
+            re.compile(r'\+(?:[0-9]\s?){6,14}[0-9]'),
+            # Indian mobile numbers with country code (91) and 10 digits
+            re.compile(r'(?:\+?91|0)?[\s-]?[6-9]\d{9}'),
+            # Standard 10-digit numbers (Indian mobile/landline)
+            re.compile(r'[6-9]\d{9}'),
+            # US/Canada format (123-456-7890, (123) 456-7890, 123.456.7890)
+            re.compile(r'(?:\+?1[\s.-]?)?\(?([0-9]{3})\)?[\s.-]?([0-9]{3})[\s.-]?([0-9]{4})'),
+            # International format without + (e.g., 91 98765 43210)
+            re.compile(r'(?:\d[\s-]?){8,15}')
         ]
         
         self.setup_browser()
@@ -366,8 +373,59 @@ class OptimizedGoogleMapsScraper:
         except Exception as e:
             return None
 
+    def _format_phone_number(self, phone):
+        """Format phone number to standard international format"""
+        if not phone:
+            return None
+            
+        # Remove all non-digit characters
+        digits = re.sub(r'\D', '', phone)
+        
+        # If empty after cleaning, return None
+        if not digits:
+            return None
+            
+        # Handle Indian numbers (10 digits)
+        if len(digits) == 10 and digits[0] in '6789':
+            return f"+91{digits}"
+            
+        # Handle numbers with Indian country code (91)
+        if len(digits) == 12 and digits.startswith('91') and digits[2] in '6789':
+            return f"+{digits}"
+            
+        # Handle other international numbers
+        if len(digits) >= 10:
+            # If it already has a country code
+            if digits.startswith(('1', '7', '20', '27', '30', '31', '32', '33', '34', '36', '39', 
+                               '40', '41', '43', '44', '45', '46', '47', '48', '49', '51', '52', 
+                               '53', '54', '55', '56', '57', '58', '60', '61', '62', '63', '64', 
+                               '65', '66', '81', '82', '84', '86', '90', '91', '92', '93', '94', 
+                               '95', '98', '211', '212', '213', '216', '218', '220', '221', '222', 
+                               '223', '224', '225', '226', '227', '228', '229', '230', '231', '232', 
+                               '233', '234', '235', '236', '237', '238', '239', '240', '241', '242', 
+                               '243', '244', '245', '246', '247', '248', '249', '250', '251', '252', 
+                               '253', '254', '255', '256', '257', '258', '260', '261', '262', '263', 
+                               '264', '265', '266', '267', '268', '269', '290', '291', '297', '298', 
+                               '299', '350', '351', '352', '353', '354', '355', '356', '357', '358', 
+                               '359', '370', '371', '372', '373', '374', '375', '376', '377', '378', 
+                               '379', '380', '381', '382', '383', '385', '386', '387', '389', '420', 
+                               '421', '423', '500', '501', '502', '503', '504', '505', '506', '507', 
+                               '508', '509', '590', '591', '592', '593', '594', '595', '596', '597', 
+                               '598', '599', '670', '672', '673', '674', '675', '676', '677', '678', 
+                               '679', '680', '681', '682', '683', '685', '686', '687', '688', '689', 
+                               '690', '691', '692', '693', '694', '695', '696', '697', '698', '850', 
+                               '852', '853', '855', '856', '870', '872', '880', '886', '960', '961', 
+                               '962', '963', '964', '965', '966', '967', '968', '970', '971', '972', 
+                               '973', '974', '975', '976', '977', '992', '993', '994', '995', '996', '998')):
+                return f"+{digits}"
+            # Default to +1 for US/Canada if no country code
+            elif len(digits) == 10:
+                return f"+1{digits}"
+                
+        return None
+
     def _extract_phone_from_element(self, element):
-        """Extract phone from element"""
+        """Extract and format phone number from element"""
         try:
             sources = [
                 element.get_attribute('aria-label') or '',
@@ -376,16 +434,29 @@ class OptimizedGoogleMapsScraper:
             ]
             
             for text in sources:
-                text = text.replace('tel:', '').replace('Phone: ', '')
+                # Clean up the text
+                text = text.replace('tel:', '').replace('Phone: ', '').strip()
+                
+                # Try each pattern to find a match
                 for pattern in self.phone_patterns:
-                    match = pattern.search(text)
-                    if match:
-                        phone = match.group(0)
-                        digits = re.sub(r'\D', '', phone)
-                        if len(digits) >= 10:
-                            return phone
+                    matches = pattern.findall(text)
+                    if matches:
+                        # Handle different pattern formats
+                        if isinstance(matches[0], tuple):
+                            # For patterns with groups, join all groups
+                            phone = ''.join(matches[0])
+                        else:
+                            phone = matches[0] if isinstance(matches, list) else matches
+                        
+                        # Format the phone number
+                        formatted_phone = self._format_phone_number(phone)
+                        if formatted_phone:
+                            return formatted_phone
+            
             return None
-        except:
+            
+        except Exception as e:
+            print(f"⚠️ Error extracting phone: {e}")
             return None
 
     def run_scraping(self):
